@@ -1,6 +1,11 @@
 import os
 import re
 from pathlib import Path
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logging.info('This will get logged')
+
 
 
 def parse_java_file(filename):
@@ -55,15 +60,21 @@ def convert_java_class(java_class, relative_dir):
         if property_match:
             java_type = property_match.group(1)
             ts_type_tuple = convert_java_type_to_ts_type(java_type)
-            ts_type = ts_type_tuple[1]
+            
+                
+            if ts_type_tuple in ['number', 'boolean', 'string']:
+                ts_type = ts_type_tuple
+            else:
+                ts_type = ts_type_tuple[1]
+
+            logging.info(ts_type_tuple)
 
             # If ts_type is a custom type, add an import statement
-            if ts_type_tuple[0] not in ['number', 'boolean', 'string']:
+            if ts_type_tuple not in ['number', 'boolean', 'string']:
                 ts_imports.add(f"import {{ {ts_type_tuple[0]} }} from '@type/{relative_dir}/{ts_type_tuple[0]}';")
 
             ts_name = property_match.group(2)
             ts_properties.append(f"  {ts_name}?:{ts_type};  // {get_comment(line)}")
-
     
     imports_section = '\n'.join(ts_imports) + '\n' if ts_imports else ''
     return imports_section + f"// prettier-ignore\nexport type {classname}Type = {extends}{{\n{os.linesep.join(ts_properties)}\n}}"
@@ -72,7 +83,7 @@ def convert_java_class(java_class, relative_dir):
 
 
 def convert_java_type_to_ts_type(java_type):
-    if java_type in ['int', 'long', 'float', 'double', 'Double', 'short', 'byte', 'Integer']:
+    if java_type in ['int', 'Integer', 'long', 'Long', 'float', 'double', 'Double', 'short', 'byte']:
         return 'number'
     elif java_type in ['boolean', 'Boolean']:
         return 'boolean'
@@ -85,6 +96,7 @@ def convert_java_type_to_ts_type(java_type):
             converted_type = f'{inner_type}[]'
             return (inner_type, converted_type)
     return (java_type, java_type)  # use original java type name if not matched with any known types
+
 
 
 
