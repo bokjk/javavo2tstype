@@ -23,7 +23,7 @@ def convert_java_directory_to_ts(java_directory, ts_directory, logger):
         for java_file in java_files:
             java_filepath = os.path.join(root, java_file)
             relative_dir = Path(root).relative_to(java_directory)
-            ts_filepath = Path(ts_directory) / relative_dir / (java_file.replace(".java", "Type.ts"))
+            ts_filepath = Path(ts_directory) / relative_dir / (java_file.replace(".java", ".ts"))
 
             # Create directory if it doesn't exist
             ts_filepath.parent.mkdir(parents=True, exist_ok=True)
