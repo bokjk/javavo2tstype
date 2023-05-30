@@ -62,10 +62,8 @@ def convert_java_class(java_class, relative_dir, java_directory):
             classname = classname_match.group(1)
         if extends_match:
             target_class_path = find_file_path(java_directory, f"{extends_match.group(1)}.java")
-
             formatted_path = str(target_class_path).replace('\\', '/')
 
-            # formatted_path = str(relative_dir).replace('\\', '/')
             extends = extends_match.group(1) + " & "
             ts_imports.add(f"import {{ {extends_match.group(1)} }} from '{prefixType}/{formatted_path}/{extends_match.group(1)}';")
 
@@ -74,16 +72,17 @@ def convert_java_class(java_class, relative_dir, java_directory):
             java_type = property_match.group(1)
             ts_type_tuple = convert_java_type_to_ts_type(java_type)
                 
-            if ts_type_tuple in ['number', 'boolean', 'string']:
+            if ts_type_tuple in ['number', 'boolean', 'string','number[]', 'boolean[]', 'string[]']: 
                 ts_type = ts_type_tuple
             else:
                 ts_type = ts_type_tuple[1]
 
-            # logging.info(ts_type_tuple)
+
 
             # If ts_type is a custom type, add an import statement
-            if ts_type_tuple not in ['number', 'boolean', 'string']:
+            if ts_type_tuple not in ['number', 'boolean', 'string','number[]', 'boolean[]', 'string[]']:
                 target_class_path = find_file_path(java_directory, f"{ts_type_tuple[0]}.java")
+                
                 
                 if target_class_path is not None:
                     formatted_path = target_class_path.replace('\\', '/')
@@ -92,6 +91,12 @@ def convert_java_class(java_class, relative_dir, java_directory):
                     formatted_path = str(relative_dir).replace('\\', '/')
                     ts_imports.add(f"import {{ {ts_type_tuple[0]} }} from '{prefixType}/{formatted_path}/{ts_type_tuple[0]}';")
 
+
+            # if ts_type in ['u']:
+            #     logging.info('-------------------')
+            #     logging.info(ts_type_tuple)
+            #     logging.info(ts_type)
+            #     logging.info('-------------------')
 
             ts_name = property_match.group(2)
             ts_properties.append(f"  {ts_name}?:{ts_type};  // {get_comment(line)}")
@@ -103,16 +108,34 @@ def convert_java_class(java_class, relative_dir, java_directory):
 
 
 def convert_java_type_to_ts_type(java_type):
-    if java_type in ['int', 'Integer', 'long', 'Long', 'float', 'double', 'Double', 'short', 'byte']:
+    java_type = java_type.strip()
+
+    if java_type in ['int[]', 'Integer[]', 'long[]', 'Long[]', 'float[]', 'double[]', 'Double[]', 'short[]', 'byte[]']:
+        return 'number[]'
+    elif java_type in ['boolean[]', 'Boolean[]']:
+        return 'boolean'
+    elif java_type in ['String[]', 'Date[]']:
+        return 'string'
+    elif java_type in ['int', 'Integer', 'long', 'Long', 'float', 'double', 'Double', 'short', 'byte']:
         return 'number'
     elif java_type in ['boolean', 'Boolean']:
         return 'boolean'
     elif java_type in ['String', 'Date']:
         return 'string'
+    elif '[]' in java_type:
+        return (java_type.replace('[]',''), java_type)
     elif 'List' in java_type:
         match = re.match(r'List<(.*)>', java_type)
         if match:
             inner_type = match.group(1)
+
+            if inner_type in ['int', 'Integer', 'long', 'Long', 'float', 'double', 'Double', 'short', 'byte']:
+                return 'number[]'
+            elif inner_type in ['boolean', 'Boolean']:
+                return 'boolean[]'
+            elif inner_type in ['String', 'Date']:
+                return 'string[]'
+
             converted_type = f'{inner_type}[]'
             return (inner_type, converted_type)
     return (java_type, java_type)  # use original java type name if not matched with any known types
