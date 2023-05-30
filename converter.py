@@ -6,6 +6,13 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logging.info('This will get logged')
 
+def find_file_path(directory, target_filename):
+    for root, dirs, files in os.walk(directory):
+        for filename in files:
+            if filename == target_filename:
+                relative_path = os.path.relpath(root, directory)
+                return relative_path.replace(os.sep, '/')
+    return None
 
 
 def parse_java_file(filename):
@@ -13,9 +20,9 @@ def parse_java_file(filename):
         lines = file.readlines()
     return lines
 
-def convert_java_to_ts(java_filepath, ts_filepath, relative_dir):
+def convert_java_to_ts(java_filepath, ts_filepath, relative_dir, java_directory):
     java_class = parse_java_file(java_filepath)
-    ts_class = convert_java_class(java_class, relative_dir)
+    ts_class = convert_java_class(java_class, relative_dir, java_directory)
     with open(ts_filepath, 'w', encoding='utf-8') as file:  # Added encoding='utf-8'
         file.write(ts_class)
 
@@ -33,7 +40,7 @@ def convert_java_directory_to_ts(java_directory, ts_directory, logger):
             # Create directory if it doesn't exist
             ts_filepath.parent.mkdir(parents=True, exist_ok=True)
 
-            convert_java_to_ts(java_filepath, ts_filepath, str(relative_dir).replace("\\", "/"))
+            convert_java_to_ts(java_filepath, ts_filepath, relative_dir, java_directory)
 
     logger.log("Java directory to TypeScript conversion complete.")
     logger.finished()  # Emit the finished signal
@@ -41,11 +48,12 @@ def convert_java_directory_to_ts(java_directory, ts_directory, logger):
 
 
 
-def convert_java_class(java_class, relative_dir):
+def convert_java_class(java_class, relative_dir, java_directory):
     classname = ""
     extends = ""
     ts_properties = []
     ts_imports = set()  # To store unique imports
+    prefixType = '@type2'
 
     for line in java_class:
         classname_match = re.search(r'public class (\w+)', line)
@@ -53,31 +61,43 @@ def convert_java_class(java_class, relative_dir):
         if classname_match:
             classname = classname_match.group(1)
         if extends_match:
+            target_class_path = find_file_path(java_directory, f"{extends_match.group(1)}.java")
+
+            formatted_path = str(target_class_path).replace('\\', '/')
+
+            # formatted_path = str(relative_dir).replace('\\', '/')
             extends = extends_match.group(1) + " & "
-            ts_imports.add(f"import {{ {extends_match.group(1)} }} from '@type/{relative_dir}/{extends_match.group(1)}';")
+            ts_imports.add(f"import {{ {extends_match.group(1)} }} from '{prefixType}/{formatted_path}/{extends_match.group(1)}';")
 
         property_match = re.search(r'private (.*?) (\w+);', line)
         if property_match:
             java_type = property_match.group(1)
             ts_type_tuple = convert_java_type_to_ts_type(java_type)
-            
                 
             if ts_type_tuple in ['number', 'boolean', 'string']:
                 ts_type = ts_type_tuple
             else:
                 ts_type = ts_type_tuple[1]
 
-            logging.info(ts_type_tuple)
+            # logging.info(ts_type_tuple)
 
             # If ts_type is a custom type, add an import statement
             if ts_type_tuple not in ['number', 'boolean', 'string']:
-                ts_imports.add(f"import {{ {ts_type_tuple[0]} }} from '@type/{relative_dir}/{ts_type_tuple[0]}';")
+                target_class_path = find_file_path(java_directory, f"{ts_type_tuple[0]}.java")
+                
+                if target_class_path is not None:
+                    formatted_path = target_class_path.replace('\\', '/')
+                    ts_imports.add(f"import {{ {ts_type_tuple[0]} }} from '{prefixType}/{formatted_path}/{ts_type_tuple[0]}';")
+                else:
+                    formatted_path = str(relative_dir).replace('\\', '/')
+                    ts_imports.add(f"import {{ {ts_type_tuple[0]} }} from '{prefixType}/{formatted_path}/{ts_type_tuple[0]}';")
+
 
             ts_name = property_match.group(2)
             ts_properties.append(f"  {ts_name}?:{ts_type};  // {get_comment(line)}")
     
     imports_section = '\n'.join(ts_imports) + '\n' if ts_imports else ''
-    return imports_section + f"// prettier-ignore\nexport type {classname}Type = {extends}{{\n{os.linesep.join(ts_properties)}\n}}"
+    return imports_section + f"// prettier-ignore\nexport type {classname} = {extends}{{\n{os.linesep.join(ts_properties)}\n}}"
 
 
 
