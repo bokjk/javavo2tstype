@@ -75,13 +75,12 @@ def convert_java_class(java_class, relative_dir, java_directory):
             ts_type_tuple = convert_java_type_to_ts_type(java_type)
 
                 
-            if ts_type_tuple in ['number', 'boolean', 'string','number[]', 'boolean[]', 'string[]', 'any']: 
+            if ts_type_tuple in ['number', 'boolean', 'string','number[]', 'boolean[]', 'string[]', 'any', 'any[]']: 
                 ts_type = ts_type_tuple
             else:
                 ts_type = ts_type_tuple[1]
-
-
-
+ 
+            
             # If ts_type is a custom type, add an import statement
             if ts_type_tuple not in ['number', 'boolean', 'string','number[]', 'boolean[]', 'string[]', 'any', 'any[]']:
                 target_class_path = find_file_path(java_directory, f"{ts_type_tuple[0]}.java")
@@ -96,15 +95,16 @@ def convert_java_class(java_class, relative_dir, java_directory):
 
 
             # if ts_type in ['any[]']:
+            # if ts_type in 'n':
             #     logging.info('-------------------')
             #     logging.info(ts_type_tuple)
             #     logging.info(ts_type)
             #     logging.info('-------------------')
 
             properties = property_match.group(2).split(",")
+                
             for prop in properties:
-                # ts_name = property_match.group(2)
-                ts_name = prop.strip()
+                ts_name = prop.strip().split(" ")[-1]
                 ts_properties.append(f"  {ts_name}?:{ts_type};  // {get_comment(line)}")
     
     imports_section = '\n'.join(ts_imports) + '\n' if ts_imports else ''
@@ -119,36 +119,65 @@ def convert_java_type_to_ts_type(java_type):
     if java_type in ['int[]', 'Integer[]', 'long[]', 'Long[]', 'float[]', 'Float[]', 'double[]', 'Double[]', 'short[]', 'Short[]', 'byte[]', 'Byte[]']:
         return 'number[]'
     elif java_type in ['boolean[]', 'Boolean[]']:
-        return 'boolean'
+        return 'boolean[]'
     elif java_type in ['String[]', 'Date[]']:
-        return 'string'
+        return 'string[]'
     elif java_type in ['int', 'Integer', 'long', 'Long', 'float', 'Float', 'double', 'Double', 'short', 'Short', 'byte', 'Byte']:
         return 'number'
     elif java_type in ['boolean', 'Boolean']:
         return 'boolean'
-    elif java_type in ['String', 'Date']:
+    elif java_type in ['String', 'Date', 'static', 'Timestamp']:
         return 'string'
-    elif java_type in ['MultipartFile', 'java.sql.Timestamp', 'Object', 'TreeNode<K,T>','TreeNodeDyna<K,T>']:
+    elif java_type in ['MultipartFile', 'java.sql.Timestamp', 'Object', 'TreeNode<K,T>','TreeNodeDyna<K,T>', 'K', 'T']:
         return 'any'
     elif java_type in ['MultipartFile[]', 'Object[]']:
         return ('any', 'any[]')
     elif '[]' in java_type:
-        return (java_type.replace('[]',''), java_type)
+        return (java_type.replace('[]',''), java_type) 
     elif 'List' in java_type:
         match = re.match(r'List<(.*)>', java_type)
         
         if match:
             inner_type = match.group(1)
+
             if inner_type in ['int', 'Integer', 'long', 'Long', 'float', 'Float', 'double', 'Double', 'short', 'Short', 'byte', 'Byte']:
                 return 'number[]'
             elif inner_type in ['boolean', 'Boolean']:
                 return 'boolean[]'
-            elif inner_type in ['String', 'Date']:
+            elif inner_type in ['String', 'Date', 'static', 'Timestamp']:
                 return 'string[]'
+            elif inner_type in ['TreeNode<K,T>', 'TreeNodeDyna<K,T>', 'Object']:
+                return 'any[]'
+            # else:
+            #     logging.info(inner_type)
 
             converted_type = f'{inner_type}[]'
-            return (inner_type, converted_type)
-    return (java_type, java_type)  # use original java type name if not matched with any known types
+            return (inner_type, converted_type) 
+        else:
+            # logging.info(java_type)
+            if 'List<Map<String' in java_type:
+                return ('any', 'any[]') 
+    elif 'Set' in java_type:
+        match = re.match(r'Set<(.*)>', java_type)
+        
+        if match:
+            inner_type = match.group(1)
+
+            if inner_type in ['int', 'Integer', 'long', 'Long', 'float', 'Float', 'double', 'Double', 'short', 'Short', 'byte', 'Byte']:
+                return 'number[]'
+            elif inner_type in ['boolean', 'Boolean']:
+                return 'boolean[]'
+            elif inner_type in ['String', 'Date', 'static', 'Timestamp']:
+                return 'string[]'
+            elif inner_type in ['TreeNode<K,T>', 'TreeNodeDyna<K,T>', 'Object']: 
+                return 'any[]'
+
+            converted_type = f'{inner_type}[]'
+            return (inner_type, converted_type) 
+    else:
+        logging.info(java_type)
+
+    return (java_type, java_type)  # use original java type name if not matched with any known types 
 
 
 
@@ -157,4 +186,4 @@ def convert_java_type_to_ts_type(java_type):
 
 def get_comment(line):
     comment_match = re.search(r'//(.+)', line)
-    return comment_match.group(1).strip() if comment_match else ""
+    return comment_match.group(1).strip() if comment_match else "" 
