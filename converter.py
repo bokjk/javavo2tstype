@@ -58,6 +58,7 @@ def convert_java_class(java_class, relative_dir, java_directory):
     for line in java_class:
         classname_match = re.search(r'public class (\w+)', line)
         extends_match = re.search(r'public class \w+ extends (\w+)', line)
+
         if classname_match:
             classname = classname_match.group(1)
         if extends_match:
@@ -67,12 +68,14 @@ def convert_java_class(java_class, relative_dir, java_directory):
             extends = extends_match.group(1) + " & "
             ts_imports.add(f"import {{ {extends_match.group(1)} }} from '{prefixType}/{formatted_path}/{extends_match.group(1)}';")
 
-        property_match = re.search(r'private (.*?) (\w+);', line)
+        # property_match = re.search(r'private (.*?) (.*?);', line)
+        property_match = re.search(r'^\s*private (.*?) (.*?);', line)
         if property_match:
             java_type = property_match.group(1)
             ts_type_tuple = convert_java_type_to_ts_type(java_type)
+
                 
-            if ts_type_tuple in ['number', 'boolean', 'string','number[]', 'boolean[]', 'string[]']: 
+            if ts_type_tuple in ['number', 'boolean', 'string','number[]', 'boolean[]', 'string[]', 'any']: 
                 ts_type = ts_type_tuple
             else:
                 ts_type = ts_type_tuple[1]
@@ -80,26 +83,29 @@ def convert_java_class(java_class, relative_dir, java_directory):
 
 
             # If ts_type is a custom type, add an import statement
-            if ts_type_tuple not in ['number', 'boolean', 'string','number[]', 'boolean[]', 'string[]']:
+            if ts_type_tuple not in ['number', 'boolean', 'string','number[]', 'boolean[]', 'string[]', 'any', 'any[]']:
                 target_class_path = find_file_path(java_directory, f"{ts_type_tuple[0]}.java")
-                
-                
-                if target_class_path is not None:
-                    formatted_path = target_class_path.replace('\\', '/')
-                    ts_imports.add(f"import {{ {ts_type_tuple[0]} }} from '{prefixType}/{formatted_path}/{ts_type_tuple[0]}';")
-                else:
-                    formatted_path = str(relative_dir).replace('\\', '/')
-                    ts_imports.add(f"import {{ {ts_type_tuple[0]} }} from '{prefixType}/{formatted_path}/{ts_type_tuple[0]}';")
+                if ts_type_tuple[0] not in ['any', 'any[]']:
+
+                    if target_class_path is not None:
+                        formatted_path = target_class_path.replace('\\', '/')
+                        ts_imports.add(f"import {{ {ts_type_tuple[0]} }} from '{prefixType}/{formatted_path}/{ts_type_tuple[0]}';")
+                    else:
+                        formatted_path = str(relative_dir).replace('\\', '/')
+                        ts_imports.add(f"import {{ {ts_type_tuple[0]} }} from '{prefixType}/{formatted_path}/{ts_type_tuple[0]}';")
 
 
-            # if ts_type in ['u']:
+            # if ts_type in ['any[]']:
             #     logging.info('-------------------')
             #     logging.info(ts_type_tuple)
             #     logging.info(ts_type)
             #     logging.info('-------------------')
 
-            ts_name = property_match.group(2)
-            ts_properties.append(f"  {ts_name}?:{ts_type};  // {get_comment(line)}")
+            properties = property_match.group(2).split(",")
+            for prop in properties:
+                # ts_name = property_match.group(2)
+                ts_name = prop.strip()
+                ts_properties.append(f"  {ts_name}?:{ts_type};  // {get_comment(line)}")
     
     imports_section = '\n'.join(ts_imports) + '\n' if ts_imports else ''
     return imports_section + f"// prettier-ignore\nexport type {classname} = {extends}{{\n{os.linesep.join(ts_properties)}\n}}"
@@ -110,26 +116,30 @@ def convert_java_class(java_class, relative_dir, java_directory):
 def convert_java_type_to_ts_type(java_type):
     java_type = java_type.strip()
 
-    if java_type in ['int[]', 'Integer[]', 'long[]', 'Long[]', 'float[]', 'double[]', 'Double[]', 'short[]', 'byte[]']:
+    if java_type in ['int[]', 'Integer[]', 'long[]', 'Long[]', 'float[]', 'Float[]', 'double[]', 'Double[]', 'short[]', 'Short[]', 'byte[]', 'Byte[]']:
         return 'number[]'
     elif java_type in ['boolean[]', 'Boolean[]']:
         return 'boolean'
     elif java_type in ['String[]', 'Date[]']:
         return 'string'
-    elif java_type in ['int', 'Integer', 'long', 'Long', 'float', 'double', 'Double', 'short', 'byte']:
+    elif java_type in ['int', 'Integer', 'long', 'Long', 'float', 'Float', 'double', 'Double', 'short', 'Short', 'byte', 'Byte']:
         return 'number'
     elif java_type in ['boolean', 'Boolean']:
         return 'boolean'
     elif java_type in ['String', 'Date']:
         return 'string'
+    elif java_type in ['MultipartFile', 'java.sql.Timestamp', 'Object', 'TreeNode<K,T>','TreeNodeDyna<K,T>']:
+        return 'any'
+    elif java_type in ['MultipartFile[]', 'Object[]']:
+        return ('any', 'any[]')
     elif '[]' in java_type:
         return (java_type.replace('[]',''), java_type)
     elif 'List' in java_type:
         match = re.match(r'List<(.*)>', java_type)
+        
         if match:
             inner_type = match.group(1)
-
-            if inner_type in ['int', 'Integer', 'long', 'Long', 'float', 'double', 'Double', 'short', 'byte']:
+            if inner_type in ['int', 'Integer', 'long', 'Long', 'float', 'Float', 'double', 'Double', 'short', 'Short', 'byte', 'Byte']:
                 return 'number[]'
             elif inner_type in ['boolean', 'Boolean']:
                 return 'boolean[]'
