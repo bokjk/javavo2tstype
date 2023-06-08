@@ -86,12 +86,15 @@ def convert_java_class(java_class, relative_dir, java_directory):
                 target_class_path = find_file_path(java_directory, f"{ts_type_tuple[0]}.java")
                 if ts_type_tuple[0] not in ['any', 'any[]']:
 
-                    if target_class_path is not None:
-                        formatted_path = target_class_path.replace('\\', '/')
-                        ts_imports.add(f"import {{ {ts_type_tuple[0]} }} from '{prefixType}/{formatted_path}/{ts_type_tuple[0]}';")
-                    else:
-                        formatted_path = str(relative_dir).replace('\\', '/')
-                        ts_imports.add(f"import {{ {ts_type_tuple[0]} }} from '{prefixType}/{formatted_path}/{ts_type_tuple[0]}';")
+                    if classname not in ts_type_tuple[0]:
+                        # logging.info(ts_type)
+
+                        if target_class_path is not None:
+                            formatted_path = target_class_path.replace('\\', '/')
+                            ts_imports.add(f"import {{ {ts_type_tuple[0]} }} from '{prefixType}/{formatted_path}/{ts_type_tuple[0]}';")
+                        else:
+                            formatted_path = str(relative_dir).replace('\\', '/')
+                            ts_imports.add(f"import {{ {ts_type_tuple[0]} }} from '{prefixType}/{formatted_path}/{ts_type_tuple[0]}';")
 
 
             # if ts_type in ['any[]']:
@@ -174,8 +177,8 @@ def convert_java_type_to_ts_type(java_type):
 
             converted_type = f'{inner_type}[]'
             return (inner_type, converted_type) 
-    else:
-        logging.info(java_type)
+    # else:
+    #     logging.info(java_type)
 
     return (java_type, java_type)  # use original java type name if not matched with any known types 
 
