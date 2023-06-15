@@ -6,6 +6,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logging.info('This will get logged')
 
+
 def find_file_path(directory, target_filename):
     for root, dirs, files in os.walk(directory):
         for filename in files:
@@ -20,27 +21,30 @@ def parse_java_file(filename):
         lines = file.readlines()
     return lines
 
-def convert_java_to_ts(java_filepath, ts_filepath, relative_dir, java_directory):
+def convert_java_to_ts(java_filepath, ts_filepath, relative_dir, java_directory, prefixType):
     java_class = parse_java_file(java_filepath)
-    ts_class = convert_java_class(java_class, relative_dir, java_directory)
+    ts_class = convert_java_class(java_class, relative_dir, java_directory, prefixType)
     with open(ts_filepath, 'w', encoding='utf-8') as file:  # Added encoding='utf-8'
         file.write(ts_class)
 
-def convert_java_directory_to_ts(java_directory, ts_directory, logger):
+def convert_java_directory_to_ts(java_directory, ts_directory, logger, prefixType):
     logger.log("Converting Java directory to TypeScript...")
 
     for root, dirs, files in os.walk(java_directory):
         java_files = [f for f in files if f.endswith(".java")]
 
-        for java_file in java_files:
-            java_filepath = os.path.join(root, java_file)
-            relative_dir = Path(root).relative_to(java_directory)
-            ts_filepath = Path(ts_directory) / relative_dir / (java_file.replace(".java", ".ts"))
+        if 'vo' in root or 'entity' in root:  # Check if the root directory contains 'vo' or 'entity'
+            for java_file in java_files:
+                java_filepath = os.path.join(root, java_file)
+                relative_dir = Path(root).relative_to(java_directory)
+                ts_filepath = Path(ts_directory) / relative_dir / (java_file.replace(".java", ".ts"))
 
-            # Create directory if it doesn't exist
-            ts_filepath.parent.mkdir(parents=True, exist_ok=True)
+                logger.log(java_filepath)
+                # Create directory if it doesn't exist
+                ts_filepath.parent.mkdir(parents=True, exist_ok=True)
 
-            convert_java_to_ts(java_filepath, ts_filepath, relative_dir, java_directory)
+                convert_java_to_ts(java_filepath, ts_filepath, relative_dir, java_directory, prefixType)
+
 
     logger.log("Java directory to TypeScript conversion complete.")
     logger.finished()  # Emit the finished signal
@@ -48,12 +52,12 @@ def convert_java_directory_to_ts(java_directory, ts_directory, logger):
 
 
 
-def convert_java_class(java_class, relative_dir, java_directory):
+def convert_java_class(java_class, relative_dir, java_directory, prefixType):
     classname = ""
     extends = ""
     ts_properties = []
     ts_imports = set()  # To store unique imports
-    prefixType = '@type2'
+    # prefixType = '@type2'
 
     for line in java_class:
         classname_match = re.search(r'public class (\w+)', line)
